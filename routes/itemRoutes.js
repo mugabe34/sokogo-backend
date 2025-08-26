@@ -1,5 +1,6 @@
 const express = require("express");
 const { authenticate } = require("../middleware/authentication");
+const { uploadMultiple, handleUploadError } = require("../middleware/upload");
 const {
     createItem,
     createManyItems,
@@ -21,8 +22,8 @@ itemRouter.get("/:itemId", getItemById);
 // Protected routes (authentication required)
 itemRouter.use(authenticate);
 
-// Create a new item listing
-itemRouter.post("/", createItem);
+// Create a new item listing with image upload
+itemRouter.post("/", uploadMultiple, handleUploadError, createItem);
 
 // Create multiple items at once
 itemRouter.post("/bulk", createManyItems);

@@ -1,5 +1,8 @@
 const bcrypt = require("bcrypt");
-const { UserModel } = require("../models/usersModel")
+const jwt = require("jsonwebtoken");
+const { UserModel } = require("../models/usersModel");
+const { validateUserRegistration, validateUserLogin } = require("../utils/validation");
+const { asyncHandler } = require("../middleware/errorHandler");
 require("dotenv").config();
 
 const register = async (req, res) => {
@@ -41,9 +44,22 @@ const register = async (req, res) => {
                     role: role || 'buyer' // Default to 'buyer' if not specified
                 });
                 await user.save();
+                // Generate JWT token
+                const token = jwt.sign(
+                    {
+                        userId: user._id,
+                        email: user.email,
+                        role: user.role
+                    },
+                    process.env.JWT_SECRET,
+                    { expiresIn: '7d' }
+                );
+
                 res.status(201).json({
                     "message": "Account created successfully",
+                    "token": token,
                     "user": {
+                        id: user._id,
                         firstName: user.firstName,
                         lastName: user.lastName,
                         email: user.email,
@@ -71,17 +87,29 @@ const login = async (req, res) => {
         if (user) {
             bcrypt.compare(password, user.password, (err, result) => {
                 if (result) {
-                                    res.status(200).json({
-                    "user": {
-                        _id: user._id,
-                        firstName: user.firstName,
-                        lastName: user.lastName,
-                        email: user.email,
-                        phoneNumber: user.phoneNumber,
-                        role: user.role
-                    },
-                    "message": "Login successful"
-                })
+                    // Generate JWT token
+                    const token = jwt.sign(
+                        {
+                            userId: user._id,
+                            email: user.email,
+                            role: user.role
+                        },
+                        process.env.JWT_SECRET,
+                        { expiresIn: '7d' }
+                    );
+
+                    res.status(200).json({
+                        "message": "Login successful",
+                        "token": token,
+                        "user": {
+                            id: user._id,
+                            firstName: user.firstName,
+                            lastName: user.lastName,
+                            email: user.email,
+                            phoneNumber: user.phoneNumber,
+                            role: user.role
+                        }
+                    })
                 } else {
                     res.status(401).json({ "message": "Invalid email or password" })
                 }

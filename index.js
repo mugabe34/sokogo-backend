@@ -12,10 +12,18 @@ const { connection } = require("./config/db")
 
 const { userRouter } = require("./routes/userRoutes")
 const { itemRouter } = require("./routes/itemRoutes")
+const { contactRouter } = require("./routes/contactRoutes")
 const { errorHandler, notFound } = require("./middleware/errorHandler")
+const { serveUploads } = require("./middleware/upload")
 const cors = require("cors")
+const path = require("path")
 
 app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+
+// Serve uploaded images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
+
 // CORS configuration for development and production
 const corsOptions = {
     origin: function (origin, callback) {
@@ -58,6 +66,9 @@ app.use("/api/auth", userRouter)
 // Item/classifieds routes
 app.use("/api/items", itemRouter)
 
+// Contact/inquiry routes
+app.use("/api/contact", contactRouter)
+
 // Health check endpoint
 app.get("/health", (req, res) => {
     res.status(200).json({
@@ -75,19 +86,46 @@ app.get("/api", (req, res) => {
         name: "Sokogo Classifieds API",
         version: "1.0.0",
         description: "Backend API for SOKOGO Classifieds Platform",
+        features: [
+            "User Authentication with JWT",
+            "Item/Product Management",
+            "Image Upload (Local & Cloud)",
+            "Email Notifications",
+            "Contact/Inquiry System",
+            "Advanced Search & Filtering",
+            "Row Level Security"
+        ],
         endpoints: {
             auth: {
                 register: "POST /api/auth/register",
-                login: "POST /api/auth/login"
+                login: "POST /api/auth/login",
+                getAllUsers: "GET /api/auth/users"
             },
             items: {
                 getAll: "GET /api/items",
-                create: "POST /api/items",
+                create: "POST /api/items (with image upload)",
+                createBulk: "POST /api/items/bulk",
                 getById: "GET /api/items/:id",
+                getMyItems: "GET /api/items/seller/my-items",
+                getPopular: "GET /api/items/popular/:category",
                 update: "PUT /api/items/:id",
                 delete: "DELETE /api/items/:id"
             },
-            health: "GET /health"
+            contact: {
+                sendInquiry: "POST /api/contact/inquiry",
+                contactForm: "POST /api/contact/contact",
+                testEmail: "GET /api/contact/test-email"
+            },
+            utility: {
+                health: "GET /health",
+                apiInfo: "GET /api",
+                uploads: "GET /uploads/:filename"
+            }
+        },
+        authentication: {
+            type: "JWT Bearer Token",
+            header: "Authorization: Bearer <token>",
+            alternativeHeader: "userid: <user_id>"
         }
     });
 });

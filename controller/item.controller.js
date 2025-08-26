@@ -1,76 +1,113 @@
 const { ItemModel } = require("../models/itemModel");
 const { UserModel } = require("../models/usersModel");
+const { validateItemCreation } = require("../utils/validation");
+const { processImages } = require("../middleware/upload");
+const emailService = require("../services/emailService");
+const { asyncHandler } = require("../middleware/errorHandler");
 
-// Create a new item listing
-const createItem = async (req, res) => {
-    try {
-        const {
-            title,
-            description,
-            category,
-            subcategory,
-            price,
-            currency,
-            location,
-            images,
-            features,
-            contactInfo
-        } = req.body;
+// Create a new item listing with image upload
+const createItem = asyncHandler(async (req, res) => {
+    const {
+        title,
+        description,
+        category,
+        subcategory,
+        price,
+        currency,
+        location,
+        features,
+        contactInfo
+    } = req.body;
 
-        const sellerId = req.userId;
+    const sellerId = req.userId;
 
-        // Validate required fields
-        if (!title || !description || !category || !subcategory || !price || !location) {
+    // Comprehensive validation
+    const validationErrors = validateItemCreation({
+        title,
+        description,
+        category,
+        subcategory,
+        price,
+        currency,
+        district: location?.district,
+        city: location?.city,
+        seller: sellerId
+    });
+
+    if (validationErrors.length > 0) {
+        return res.status(400).json({
+            success: false,
+            message: "Validation failed",
+            errors: validationErrors
+        });
+    }
+
+    // Check if user exists
+    const user = await UserModel.findById(sellerId);
+    if (!user) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found"
+        });
+    }
+
+    // Process uploaded images
+    let imageUrls = [];
+    if (req.files && req.files.length > 0) {
+        try {
+            imageUrls = await processImages(req.files);
+        } catch (error) {
+            console.error("Error processing images:", error);
             return res.status(400).json({
-                message: "Title, description, category, subcategory, price, and location are required"
+                success: false,
+                message: "Error processing uploaded images",
+                error: error.message
             });
         }
-
-        // Validate category
-        const validCategories = ['MOTORS', 'PROPERTY', 'ELECTRONICS'];
-        if (!validCategories.includes(category)) {
-            return res.status(400).json({ message: "Invalid category" });
-        }
-
-        // Check if user exists
-        const user = await UserModel.findById(sellerId);
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        // Create item
-        const item = new ItemModel({
-            title,
-            description,
-            category,
-            subcategory,
-            price,
-            currency: currency || 'Frw',
-            location,
-            images: images || [],
-            seller: sellerId,
-            features: features || {},
-            contactInfo: {
-                phone: contactInfo?.phone || user.phoneNumber,
-                email: contactInfo?.email || user.email
-            }
-        });
-
-        await item.save();
-
-        // Populate seller details
-        await item.populate('seller', 'firstName lastName email phoneNumber');
-
-        res.status(201).json({
-            message: "Item created successfully",
-            item
-        });
-
-    } catch (error) {
-        console.error("Error creating item:", error);
-        res.status(500).json({ message: "Error creating item" });
     }
-};
+
+    // Create item
+    const item = new ItemModel({
+        title: title.trim(),
+        description: description.trim(),
+        category,
+        subcategory: subcategory.trim(),
+        price: parseFloat(price),
+        currency: currency || 'Frw',
+        location: {
+            district: location.district.trim(),
+            city: location.city.trim(),
+            address: location.address?.trim() || ''
+        },
+        images: imageUrls,
+        seller: sellerId,
+        features: features || {},
+        contactInfo: {
+            phone: contactInfo?.phone || user.phoneNumber,
+            email: contactInfo?.email || user.email
+        }
+    });
+
+    await item.save();
+
+    // Populate seller details
+    await item.populate('seller', 'firstName lastName email phoneNumber');
+
+    // Send email notification (optional)
+    try {
+        await emailService.sendItemPostedEmail(user, item);
+    } catch (emailError) {
+        console.warn('⚠️ Failed to send email notification:', emailError.message);
+        // Don't fail the request if email fails
+    }
+
+    res.status(201).json({
+        success: true,
+        message: "Item created successfully",
+        item,
+        imagesUploaded: imageUrls.length
+    });
+});
 
 // Create multiple items at once
 const createManyItems = async (req, res) => {
