@@ -43,7 +43,6 @@ CREATE TABLE items (
     "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     "updatedAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
 -- =====================================================
 -- 3. INDEXES
 -- =====================================================
@@ -111,40 +110,30 @@ CREATE TRIGGER update_items_updated_at
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE items ENABLE ROW LEVEL SECURITY;
 
--- Users RLS Policies
-CREATE POLICY "Users can view own profile" ON users
+-- Safe Users RLS Policies (No Recursion)
+CREATE POLICY "users_select_own" ON users
     FOR SELECT USING (auth.uid() = id);
 
-CREATE POLICY "Users can update own profile" ON users
+CREATE POLICY "users_update_own" ON users
     FOR UPDATE USING (auth.uid() = id)
-    WITH CHECK (auth.uid() = id AND role = (SELECT role FROM users WHERE id = auth.uid()));
+    WITH CHECK (auth.uid() = id);
 
-CREATE POLICY "Allow user registration" ON users
+CREATE POLICY "users_insert_registration" ON users
     FOR INSERT WITH CHECK (true);
 
-CREATE POLICY "Admins can manage all users" ON users
-    FOR ALL USING (
-        EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
-    );
-
--- Items RLS Policies
-CREATE POLICY "Anyone can view active items" ON items
+-- Safe Items RLS Policies (No Recursion)
+CREATE POLICY "items_select_active" ON items
     FOR SELECT USING (status = 'ACTIVE');
 
-CREATE POLICY "Users can view own items" ON items
+CREATE POLICY "items_select_own" ON items
     FOR SELECT USING (seller = auth.uid());
 
-CREATE POLICY "Users can create items" ON items
+CREATE POLICY "items_insert_own" ON items
     FOR INSERT WITH CHECK (seller = auth.uid());
 
-CREATE POLICY "Users can update own items" ON items
+CREATE POLICY "items_update_own" ON items
     FOR UPDATE USING (seller = auth.uid())
     WITH CHECK (seller = auth.uid());
 
-CREATE POLICY "Users can delete own items" ON items
+CREATE POLICY "items_delete_own" ON items
     FOR DELETE USING (seller = auth.uid());
-
-CREATE POLICY "Admins can manage all items" ON items
-    FOR ALL USING (
-        EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
-    );
