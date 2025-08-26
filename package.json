@@ -5,8 +5,12 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon index.js",
     "server": "nodemon index.js",
-    "start": "node index.js"
+    "start": "node index.js",
+    "check": "node scripts/startup-check.js",
+    "start:safe": "npm run check && npm start",
+    "kill-port": "npx kill-port 8000"
   },
   "keywords": [
     "classifieds",

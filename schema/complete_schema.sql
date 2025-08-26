@@ -82,11 +82,11 @@ ALTER TABLE items ADD CONSTRAINT check_price_positive
 -- 5. FUNCTIONS AND TRIGGERS
 -- =====================================================
 
--- Function to update updated_at timestamp
+-- Function to update updatedAt timestamp (matches camelCase naming)
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.updated_at = NOW();
+    NEW."updatedAt" = NOW();
     RETURN NEW;
 END;
 $$ language 'plpgsql';
